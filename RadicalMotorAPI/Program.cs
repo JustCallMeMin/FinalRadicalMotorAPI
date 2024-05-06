@@ -8,9 +8,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using RadicalMotor.Models;
 using RadicalMotor.Repositories;
+using RadicalMotorAPI.JWT;
+using RadicalMotorAPI.PasswordHash;
 using RadicalMotorAPI.Repositories;
-using System;
-using System.Security.Claims;
+using RadicalMotorAPI.Repository;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,6 +28,9 @@ builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
 builder.Services.AddScoped<IServiceRepository, ServiceRepository>();
 builder.Services.AddScoped<IAccountRepository, AccountRepository>();
 builder.Services.AddScoped<IVehicleRepository, VehicleRepository>();
+builder.Services.AddScoped<ILoginRepository, LoginRepository>();
+
+builder.Services.AddSingleton<JwtService>();
 
 // Configure MVC and Razor Pages
 builder.Services.AddControllersWithViews();
@@ -49,16 +53,40 @@ builder.Services.AddCors(options =>
 builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
 
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-	.AddCookie(options =>
-	{
-		options.Cookie.HttpOnly = true;
-		options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-		options.Cookie.SameSite = SameSiteMode.None;
-		options.Cookie.Path = "/";
-		options.ExpireTimeSpan = TimeSpan.FromDays(30);
-		options.SlidingExpiration = true;
-	});
+//builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+//	.AddCookie(options =>
+//	{
+//		options.Cookie.HttpOnly = true;
+//		options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+//		options.Cookie.SameSite = SameSiteMode.None;
+//		options.Cookie.Path = "/";
+//		options.ExpireTimeSpan = TimeSpan.FromDays(30);
+//		options.SlidingExpiration = true;
+//	});
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+}).AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+		ValidateIssuerSigningKey = true,
+		IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
+		ValidateIssuer = true,
+		ValidateAudience = true,
+		ValidIssuer = builder.Configuration["Jwt:Issuer"],
+		ValidAudience = builder.Configuration["Jwt:Audience"],
+		ValidateLifetime = true,
+		ClockSkew = TimeSpan.Zero,
+		RoleClaimType = "typeId"
+	};
+});
+builder.Services.AddAuthorization(options =>
+{
+	options.AddPolicy("IsAdmin", policy => policy.RequireClaim("typeId", "1"));
+});
+builder.Services.AddControllersWithViews();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -90,4 +118,8 @@ app.MapControllers();
 app.MapControllerRoute(
 	name: "default",
 	pattern: "{controller=Home}/{action=Index}/{id?}");
+app.MapAreaControllerRoute(
+	   name: "Admin",
+		  areaName: "Admin",
+			 pattern: "Admin/{controller=Admin}/{action=Index}/{id?}");
 app.Run();

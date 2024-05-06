@@ -7,11 +7,11 @@ using System.Threading.Tasks;
 
 [Route("[controller]")]
 [ApiController]
-public class CustomersController : ControllerBase
+public class CustomersApiController : ControllerBase
 {
 	private readonly ICustomerRepository _customerRepository;
 
-	public CustomersController(ICustomerRepository customerRepository)
+	public CustomersApiController(ICustomerRepository customerRepository)
 	{
 		_customerRepository = customerRepository;
 	}

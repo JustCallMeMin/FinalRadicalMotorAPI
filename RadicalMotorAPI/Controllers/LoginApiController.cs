@@ -2,6 +2,8 @@
 using RadicalMotorAPI.Repositories;
 using RadicalMotorAPI.DTO;
 using System.Threading.Tasks;
+using RadicalMotorAPI.JWT;
+using RadicalMotorAPI.Repository;
 
 namespace RadicalMotorAPI.Controllers
 {
@@ -9,35 +11,24 @@ namespace RadicalMotorAPI.Controllers
 	[ApiController]
 	public class LoginApiController : ControllerBase
 	{
-		private readonly IAccountRepository _accountRepository;
-
-		public LoginApiController(IAccountRepository accountRepository)
+		private readonly ILoginRepository _loginRepository;
+        private readonly JwtService _jwtService;
+        public LoginApiController(ILoginRepository loginRepository, JwtService jwtService)
 		{
-			_accountRepository = accountRepository;
-		}
+            _loginRepository = loginRepository;
+            _jwtService = jwtService;
+        }
 
-		[HttpPost("login")]
-		public async Task<IActionResult> Login([FromBody] LoginDTO loginDTO)
-		{
-			if (!ModelState.IsValid)
-			{
-				return BadRequest(ModelState);
-			}
-
-			var account = await _accountRepository.GetByEmailAsync(loginDTO.Email);
-			if (account != null && loginDTO.Password == account.Password)
-			{
-				var response = new LoginResponseDTO
-				{
-					AccountId = account.AccountId
-				};
-
-				return Ok(response);
-			}
-			else
-			{
-				return Unauthorized("Invalid credentials");
-			}
-		}
-	}
+        [HttpPost]
+        public async Task<IActionResult> Login([FromBody] LoginDTO loginDto)
+        {
+            var account = await _loginRepository.ValidateUserByEmail(loginDto.Email, loginDto.Password);
+            if (account != null)
+            {
+                var token = _jwtService.GenerateToken(account);
+                return Ok(new { token = token });
+            }
+            return Unauthorized();
+        }
+    }
 }
